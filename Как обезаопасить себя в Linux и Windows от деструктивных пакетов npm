@@ -1,0 +1,113 @@
+Пока что только в Linux: **
+***************************
+
+1) Создание отдельного пользователя:
+sudo adduser npmuser
+
+2) Проверка прав доступа:
+ps aux | grep npm
+
+3) Изменение прав доступа к каталогу npm:
+3.1) which npm
+3.2) sudo chown -R npmuser /path/to/npm/directory (3.1!!)
+
+4) Изменение переменной окружения NPM_CONFIG_PREFIX:
+export NPM_CONFIG_PREFIX=~/.npm-global
+
+5) echo 'export NPM_CONFIG_PREFIX=~/.npm-global' >> ~/.bashrc
+source ~/.bashrc
+
+6) Постоянное выполнение скрипта для проверки папок node_modules:
+Добавьте этот цикл в ваш скрипт scan_node_modules.sh, чтобы он выполнял сканирование папок node_modules постоянно.
+
+После применения этих шагов скрипт будет запускаться при включении компьютера и продолжать работать постоянно для проверки папок node_modules. Убедитесь, что скрипт работает корректно и не вызывает нежелательных побочных эффектов при постоянном выполнении.
+
+
+
+#!/bin/bash
+
+# Путь к каталогу, который нужно сканировать
+directory_to_scan="/"
+
+# Пользователь, на которого нужно изменить права доступа
+npm_user="npmuser"
+
+while true
+do
+    # Находим все папки node_modules и меняем права доступа
+    find "$directory_to_scan" -type d -name "node_modules" -exec chown -R $npm_user {} \;
+
+    # Пауза перед следующей проверкой (например, каждые 5 минут)
+    sleep 1
+done
+
+
+7) Добавление скрипта в автозапуск при включении компьютера:
+7.1) Добавление в systemd (для современных версий Linux):
+    Создайте новый systemd service file, например, node_modules_scan.service, в директории /etc/systemd/system/, содержащий следующее:
+
+[Unit]
+Description=Node Modules Scan Service
+After=network.target
+
+[Service]
+ExecStart=/путь_к_скрипту/scan_node_modules.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+7.2) Перезагрузите systemd, чтобы он обнаружил новый service file:
+
+sudo systemctl daemon-reload
+
+7.3) Включите и запустите сервис:
+
+sudo systemctl enable node_modules_scan.service
+sudo systemctl start node_modules_scan.service
+
+7.4) Ограничиваем запуск NodeJS использую для этого AppArmor
+
+ sudo apt install apparmor-utils apparmor-profiles
+ sudo apparmor_status
+ 
+
+
+Размещение профиля:
+    Разместите файл профиля в каталоге AppArmor, обычно это /etc/apparmor.d/.
+Создайте файл профиля, например, nodejs_profile, содержащий правило для запрета исполнения Node.js для определенных пользователей. Пример содержимого файла apparmor:
+
+
+
+#include <tunables/global>
+
+profile nodejs_profile {
+  # Include the base abstraction
+  include <abstractions/base>
+  
+  # Main executable
+  /usr/bin/node ix,
+  
+  # Allow access to all directories
+  /{,var/}** mr,
+  
+  # Restrict execution to npmuser
+  owner /usr/bin/node rwix,
+}
+
+
+
+
+
+Активация профиля:
+        Активируйте профиль командой apparmor_parser, например:
+
+sudo apparmor_parser -r /etc/apparmor.d/nodejs_profile
+
+Перезапуск AppArmor:
+
+sudo service apparmor restart
+
+Перезапускаем ОС выполнив в bash:
+
+reboot
