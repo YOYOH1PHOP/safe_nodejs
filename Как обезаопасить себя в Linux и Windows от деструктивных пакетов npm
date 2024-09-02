@@ -84,16 +84,22 @@ sudo systemctl start node_modules_scan.service
 profile nodejs_profile {
   # Include the base abstraction
   include <abstractions/base>
-  
+
   # Main executable
   /usr/bin/node ix,
-  
-  # Allow access to all directories
-  /{,var/}** mr,
-  
+    
   # Restrict execution to npmuser
   owner /usr/bin/node rwix,
+    
+  # Deny access to id_rsa file
+  deny /home/*/id_rsa r,
+  deny /home/*/.ssh/ r,
+    
+  # Deny access to other users' directories
+  deny /** r,
+  deny /home/*/** r,
 }
+
 
 
 
